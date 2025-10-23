@@ -7,6 +7,9 @@ import NameInputScreen from './components/NameInputScreen';
 import ModeSelectScreen from './components/ModeSelectScreen';
 import MultiplayerGameScreen from './components/MultiplayerGameScreen';
 import MultiplayerResultModal from './components/MultiplayerResultModal';
+import TypingDefenseScreen from './components/TypingDefenseScreen';
+import GuessTheWordScreen from './components/GuessTheWordScreen';
+import TreasureHunt3DScreen from './components/TreasureHunt3DScreen';
 
 import { Level, ScoreEntry, Opponent, RaceResult, GameState } from './types';
 import { loadLeaderboard, updateLeaderboard, savePlayerName, loadPlayerName } from './utils/storage';
@@ -58,6 +61,10 @@ const App: React.FC = () => {
   const handleSelectPractice = () => {
     setGameState('levelSelect');
   };
+  
+  const handleBackToMenu = () => {
+    setGameState('modeSelect');
+  };
 
   const startRace = useCallback(() => {
     const randomOpponent = OPPONENTS[Math.floor(Math.random() * OPPONENTS.length)];
@@ -70,6 +77,18 @@ const App: React.FC = () => {
 
   const handleSelectRivals = () => {
     startRace();
+  };
+  
+  const handleSelectTypingDefense = () => {
+    setGameState('typingDefense');
+  };
+
+  const handleSelectGuessTheWord = () => {
+    setGameState('guessTheWord');
+  };
+
+  const handleSelectTreasureHunt = () => {
+    setGameState('treasureHunt3D');
   };
 
   const handleRaceComplete = (result: RaceResult) => {
@@ -125,7 +144,14 @@ const App: React.FC = () => {
       case 'nameInput':
         return <NameInputScreen onNameSubmit={handleNameSubmit} />;
       case 'modeSelect':
-        return <ModeSelectScreen onSelectPractice={handleSelectPractice} onSelectRivals={handleSelectRivals} playerName={playerName} />;
+        return <ModeSelectScreen 
+            onSelectPractice={handleSelectPractice} 
+            onSelectRivals={handleSelectRivals} 
+            onSelectTypingDefense={handleSelectTypingDefense} 
+            onSelectGuessTheWord={handleSelectGuessTheWord}
+            onSelectTreasureHunt={handleSelectTreasureHunt}
+            playerName={playerName} 
+        />;
       case 'levelSelect':
         return <LevelSelectScreen onSelectLevel={handleSelectLevel} totalScore={totalScore} leaderboard={leaderboard} currentPlayerName={playerName} />;
       case 'playing':
@@ -163,6 +189,12 @@ const App: React.FC = () => {
               return <MultiplayerResultModal result={raceResult} onPlayAgain={startRace} onExit={handleExitRace} />
           }
           return null;
+      case 'typingDefense':
+          return <TypingDefenseScreen onExit={handleBackToMenu} />;
+      case 'guessTheWord':
+          return <GuessTheWordScreen onExit={handleBackToMenu} />;
+      case 'treasureHunt3D':
+          return <TreasureHunt3DScreen onExit={handleBackToMenu} />;
       default:
         return <StartScreen onStart={handleStart} />;
     }

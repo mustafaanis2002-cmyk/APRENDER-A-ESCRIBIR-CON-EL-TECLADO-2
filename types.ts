@@ -1,5 +1,5 @@
 // Fix: Create type definitions for Level and ScoreEntry.
-export type GameState = 'start' | 'nameInput' | 'modeSelect' | 'levelSelect' | 'playing' | 'levelComplete' | 'multiplayer-game' | 'multiplayer-result';
+export type GameState = 'start' | 'nameInput' | 'modeSelect' | 'levelSelect' | 'playing' | 'levelComplete' | 'multiplayer-game' | 'multiplayer-result' | 'typingDefense' | 'guessTheWord' | 'treasureHunt3D';
 
 export interface Level {
   level: number;

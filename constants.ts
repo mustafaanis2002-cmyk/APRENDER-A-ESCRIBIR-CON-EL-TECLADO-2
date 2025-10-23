@@ -101,3 +101,20 @@ export const RACE_CHALLENGES: string[] = [
     'Un pequeño paso para un hombre, un gran salto para la humanidad.',
     'El éxito es la suma de pequeños esfuerzos repetidos día tras día.',
 ];
+
+export const DEFENSE_WORDS: string[] = [
+    "sol", "luna", "ola", "mar", "pez", "gato", "perro", "casa", "roca", "fuego",
+    "agua", "cielo", "nube", "flor", "verde", "rojo", "azul", "jugar", "correr",
+    "saltar", "rapido", "fuerte", "planeta", "estrella", "cometa", "cohete", "nave",
+    "laser", "escudo", "energia", "galaxia", "universo", "agujero", "nebulosa",
+    "cuasar", "orbita", "impacto", "peligro", "defender", "victoria", "heroe"
+];
+
+export const GUESS_THE_WORD_WORDS: string[] = [
+    "TECLADO", "ORDENADOR", "MONITOR", "PROGRAMA", "JUEGO", "INTERNET", "CODIGO", "RATON", "VENTANA"
+];
+
+// Fix: Export PIXEL_FOREST_WORDS for the PixelForestScreen game mode.
+export const PIXEL_FOREST_WORDS: string[] = [
+    "ARBOL", "BOSQUE", "RIO", "CASCADA", "MONTAÑA", "TESORO", "MAPA", "BRUJULA", "AVENTURA", "CUEVA"
+];

@@ -1,17 +1,22 @@
-let audioContext: AudioContext | null = null;
+// Fix: Implement audio utility functions. This file previously contained storage logic.
+// Create a single AudioContext for all sounds to reuse.
+let audioContext: AudioContext | undefined;
 
-const getAudioContext = () => {
+const getAudioContext = (): AudioContext | undefined => {
+  if (typeof window === 'undefined') return undefined;
   if (!audioContext) {
     try {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
-      console.error("Web Audio API is not supported in this browser");
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch(e) {
+        console.error("Web Audio API is not supported in this browser");
+        return undefined;
     }
   }
   return audioContext;
 };
 
-const playSound = (type: OscillatorType, frequency: number, duration: number, volume: number) => {
+// A generic function to play a tone.
+const playTone = (frequency: number, duration: number, type: OscillatorType = 'sine') => {
   try {
     const context = getAudioContext();
     if (!context) return;
@@ -19,16 +24,17 @@ const playSound = (type: OscillatorType, frequency: number, duration: number, vo
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
 
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
-    
-    gainNode.gain.setValueAtTime(volume, context.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + duration);
-
     oscillator.connect(gainNode);
     gainNode.connect(context.destination);
 
+    gainNode.gain.setValueAtTime(0, context.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.01);
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
     oscillator.start(context.currentTime);
+
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + duration);
     oscillator.stop(context.currentTime + duration);
   } catch (error) {
     console.error("Could not play sound:", error);
@@ -36,38 +42,45 @@ const playSound = (type: OscillatorType, frequency: number, duration: number, vo
 };
 
 export const playCorrectSound = () => {
-  playSound('sine', 600, 0.1, 0.3);
+  playTone(600, 0.1, 'sine');
 };
 
 export const playIncorrectSound = () => {
-  playSound('square', 150, 0.2, 0.2);
+  playTone(200, 0.2, 'square');
 };
 
 export const playLevelCompleteSound = () => {
-    const context = getAudioContext();
-    if (!context) return;
-    playSound('sine', 440, 0.1, 0.3);
-    setTimeout(() => playSound('sine', 587.33, 0.1, 0.3), 100);
-    setTimeout(() => playSound('sine', 880, 0.2, 0.4), 200);
+    playTone(800, 0.1, 'triangle');
+    setTimeout(() => playTone(1000, 0.1, 'triangle'), 150);
+    setTimeout(() => playTone(1200, 0.2, 'triangle'), 300);
 };
 
-export const PRONUNCIATION_MAP: { [key: string]: string } = {
-  'ñ': 'eñe',
-  ' ': 'espacio',
+export const playJumpSound = () => {
+    playTone(440, 0.05, 'square');
 };
 
 export const speak = (text: string) => {
   try {
-    if (!('speechSynthesis' in window)) {
-        console.warn("Speech synthesis not supported in this browser.");
-        return;
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Cancel any previous speech
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES'; // Spanish
+      utterance.rate = 1.1;
+      window.speechSynthesis.speak(utterance);
     }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
-    utterance.rate = 1.2;
-    utterance.pitch = 1.1;
-    window.speechSynthesis.speak(utterance);
   } catch (error) {
     console.error("Speech synthesis failed:", error);
   }
+};
+
+// To handle specific pronunciations for Spanish alphabet
+export const PRONUNCIATION_MAP: { [key: string]: string } = {
+  'q': 'cu',
+  'w': 'uve doble',
+  'y': 'i griega',
+  'ñ': 'eñe',
+  ',': 'coma',
+  '.': 'punto',
+  '-': 'guión',
+  ' ': 'espacio',
 };
