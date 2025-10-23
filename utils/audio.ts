@@ -59,6 +59,49 @@ export const playJumpSound = () => {
     playTone(440, 0.05, 'square');
 };
 
+export const playTeleportSound = () => {
+    playTone(300, 0.1, 'sawtooth');
+    setTimeout(() => playTone(1200, 0.2, 'sawtooth'), 50);
+};
+
+export const playPlantSound = () => {
+    playTone(1200, 0.15, 'triangle');
+};
+
+export const playPurchaseSound = () => {
+    playTone(700, 0.05, 'sine');
+    setTimeout(() => playTone(900, 0.1, 'sine'), 80);
+};
+
+export const playSellSound = () => {
+    playTone(900, 0.05, 'sine');
+    setTimeout(() => playTone(1200, 0.1, 'sine'), 80);
+};
+
+export const playRemoveSound = () => {
+    playTone(300, 0.1, 'sawtooth');
+};
+
+export const playSkipSound = () => {
+    playTone(1000, 0.05, 'sawtooth');
+};
+
+
+// Pitches for the rhythm game notes (C Major Arpeggio)
+const NOTE_PITCHES = [
+    261.63, // C4
+    329.63, // E4
+    392.00, // G4
+    523.25, // C5
+];
+
+export const playNoteSound = (lane: number) => {
+    if (lane >= 0 && lane < NOTE_PITCHES.length) {
+        const frequency = NOTE_PITCHES[lane];
+        playTone(frequency, 0.2, 'triangle');
+    }
+};
+
 export const speak = (text: string) => {
   try {
     if ('speechSynthesis' in window) {

@@ -9,7 +9,10 @@ import MultiplayerGameScreen from './components/MultiplayerGameScreen';
 import MultiplayerResultModal from './components/MultiplayerResultModal';
 import TypingDefenseScreen from './components/TypingDefenseScreen';
 import GuessTheWordScreen from './components/GuessTheWordScreen';
-import TreasureHunt3DScreen from './components/TreasureHunt3DScreen';
+import RhythmTypingScreen from './components/RhythmTypingScreen';
+import TypingTeleporterScreen from './components/TypingTeleporterScreen';
+import WordGardenScreen from './components/WordGardenScreen';
+import StoryTellerScreen from './components/StoryTellerScreen';
 
 import { Level, ScoreEntry, Opponent, RaceResult, GameState } from './types';
 import { loadLeaderboard, updateLeaderboard, savePlayerName, loadPlayerName } from './utils/storage';
@@ -87,8 +90,20 @@ const App: React.FC = () => {
     setGameState('guessTheWord');
   };
 
-  const handleSelectTreasureHunt = () => {
-    setGameState('treasureHunt3D');
+  const handleSelectRhythmTyping = () => {
+    setGameState('rhythmTyping');
+  };
+
+  const handleSelectTypingTeleporter = () => {
+    setGameState('typingTeleporter');
+  };
+
+  const handleSelectWordGarden = () => {
+    setGameState('wordGarden');
+  };
+
+  const handleSelectStoryTeller = () => {
+    setGameState('storyTeller');
   };
 
   const handleRaceComplete = (result: RaceResult) => {
@@ -149,7 +164,10 @@ const App: React.FC = () => {
             onSelectRivals={handleSelectRivals} 
             onSelectTypingDefense={handleSelectTypingDefense} 
             onSelectGuessTheWord={handleSelectGuessTheWord}
-            onSelectTreasureHunt={handleSelectTreasureHunt}
+            onSelectRhythmTyping={handleSelectRhythmTyping}
+            onSelectTypingTeleporter={handleSelectTypingTeleporter}
+            onSelectWordGarden={handleSelectWordGarden}
+            onSelectStoryTeller={handleSelectStoryTeller}
             playerName={playerName} 
         />;
       case 'levelSelect':
@@ -193,8 +211,14 @@ const App: React.FC = () => {
           return <TypingDefenseScreen onExit={handleBackToMenu} />;
       case 'guessTheWord':
           return <GuessTheWordScreen onExit={handleBackToMenu} />;
-      case 'treasureHunt3D':
-          return <TreasureHunt3DScreen onExit={handleBackToMenu} />;
+      case 'rhythmTyping':
+          return <RhythmTypingScreen onExit={handleBackToMenu} />;
+      case 'typingTeleporter':
+          return <TypingTeleporterScreen onExit={handleBackToMenu} />;
+      case 'wordGarden':
+          return <WordGardenScreen onExit={handleBackToMenu} />;
+      case 'storyTeller':
+          return <StoryTellerScreen onExit={handleBackToMenu} />;
       default:
         return <StartScreen onStart={handleStart} />;
     }

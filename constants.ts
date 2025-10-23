@@ -1,5 +1,4 @@
-// Fix: Define application constants.
-import { Level, Opponent } from './types';
+import { Level, Opponent, ShopItem } from './types';
 
 export const LEVELS: Level[] = [
   {
@@ -114,7 +113,17 @@ export const GUESS_THE_WORD_WORDS: string[] = [
     "TECLADO", "ORDENADOR", "MONITOR", "PROGRAMA", "JUEGO", "INTERNET", "CODIGO", "RATON", "VENTANA"
 ];
 
-// Fix: Export PIXEL_FOREST_WORDS for the PixelForestScreen game mode.
-export const PIXEL_FOREST_WORDS: string[] = [
-    "ARBOL", "BOSQUE", "RIO", "CASCADA", "MONTAÑA", "TESORO", "MAPA", "BRUJULA", "AVENTURA", "CUEVA"
+export const SHOP_ITEMS: ShopItem[] = [
+    { id: 'wateringCan', name: 'Regadera', emoji: '💧', cost: 15, description: 'Necesaria para hacer crecer tus semillas.', type: 'consumable' },
+    { id: 'rabbit', name: 'Conejo', emoji: '🐰', cost: 100, description: 'Genera 1 regadera cada minuto.', type: 'animal' },
+    { id: 'bee', name: 'Abeja', emoji: '🐝', cost: 75, description: 'Genera 1 sol cada 10 segundos.', type: 'animal' },
+    { id: 'butterfly', name: 'Mariposa', emoji: '🦋', cost: 50, description: '¡Solo para decorar! No produce nada.', type: 'animal' },
+    { id: 'rosa', name: 'Rosa', emoji: '🌹', cost: 20, description: 'Una hermosa flor clásica.', type: 'plant' },
+    { id: 'tulipan', name: 'Tulipán', emoji: '🌷', cost: 25, description: 'Una elegante flor de primavera.', type: 'plant' },
+    { id: 'margarita', name: 'Margarita', emoji: '🌼', cost: 15, description: 'Simple y alegre.', type: 'plant' },
+    { id: 'pino', name: 'Pino', emoji: '🌲', cost: 50, description: 'Un árbol que da sombra todo el año.', type: 'plant' },
+    { id: 'palmera', name: 'Palmera', emoji: '🌴', cost: 60, description: 'Un toque tropical para tu jardín.', type: 'plant' },
+    { id: 'cactus', name: 'Cactus', emoji: '🌵', cost: 40, description: 'Resistente y no necesita mucha agua.', type: 'plant' },
+    { id: 'champiñon', name: 'Champiñón', emoji: '🍄', cost: 30, description: 'Un hongo misterioso y divertido.', type: 'plant' },
+    { id: 'girasol', name: 'Girasol', emoji: '🌻', cost: 70, description: 'Genera 5 soles cada 30 segundos.', type: 'special_plant' },
 ];
