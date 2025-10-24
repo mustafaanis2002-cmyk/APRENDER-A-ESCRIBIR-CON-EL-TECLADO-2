@@ -1,357 +1,395 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { playPlantSound, speak, playIncorrectSound, playCorrectSound, playSellSound, playSkipSound } from '../utils/audio';
-import { GardenItem, AnimalItem, ShopItem } from '../types';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { DEFENSE_WORDS, SHOP_ITEMS, GARDEN_UNLOCK_COSTS } from '../constants';
+import { Garden, GardenItem, ShopItem, ItemSize, GrowthStage } from '../types';
+import { playPlantSound, playSellSound, playPurchaseSound, playWateringSound } from '../utils/audio';
+import { saveFullGardenState, loadFullGardenState, FullGardenState } from '../utils/storage';
 import ShopModal from './ShopModal';
-import { SHOP_ITEMS } from '../constants';
-import { GoogleGenAI, Type } from "@google/genai";
+import Keyboard from './Keyboard';
+import TypingHands from './TypingHands';
+import AdminPanelModal from './AdminPanelModal';
+import AlmanacModal from './AlmanacModal';
 
-// --- Fallback Data ---
-const FALLBACK_CATEGORIES: { [key: string]: { prompt: string; words: string[] } } = {
-  flor: { prompt: "Escribe una flor", words: ['rosa', 'girasol', 'tulipan', 'flor', 'margarita', 'hibisco'] },
-  animal_bosque: { prompt: "Escribe un animal del bosque", words: ['zorro', 'oso', 'conejo', 'ciervo', 'buho', 'ardilla'] },
-  brilla: { prompt: "Escribe algo que brilla", words: ['sol', 'estrella', 'luna', 'diamante', 'oro', 'fuego'] }
-};
-const FALLBACK_KEYS = Object.keys(FALLBACK_CATEGORIES);
+type CursorMode = 'place' | 'sell' | 'water' | 'fuse';
 
-// --- Component ---
 const WordGardenScreen: React.FC<{ onExit: () => void }> = ({ onExit }) => {
-  const [items, setItems] = useState<GardenItem[]>([]);
-  const [animals, setAnimals] = useState<AnimalItem[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [currentPrompt, setCurrentPrompt] = useState<{ prompt: string; words: string[] }>({ prompt: 'Cargando pista...', words: [] });
-  const [isLoadingPrompt, setIsLoadingPrompt] = useState(true);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  
-  // Economy and Inventory
-  const [suns, setSuns] = useState(50);
-  const [wateringCans, setWateringCans] = useState(5);
-  const [isShopOpen, setIsShopOpen] = useState(false);
-  const [isSellMode, setIsSellMode] = useState(false);
-  
-  // Placement Mode
-  const [itemToPlace, setItemToPlace] = useState<ShopItem | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    // --- Core Game State ---
+    const [suns, setSuns] = useState(500);
+    const [water, setWater] = useState(10);
+    const [gardens, setGardens] = useState<Garden[]>([{ id: 1, items: [] }]);
+    const [currentGardenId, setCurrentGardenId] = useState(1);
+    const [almanacDiscovered, setAlmanacDiscovered] = useState<number[]>([]);
+    
+    // --- Progression State ---
+    const [isVip, setIsVip] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isBioEngineer, setIsBioEngineer] = useState(false);
+    const [hasTeleporter, setHasTeleporter] = useState(false);
+    const [customPlants, setCustomPlants] = useState<ShopItem[]>([]);
+    
+    // --- UI & Interaction State ---
+    const [showShop, setShowShop] = useState(false);
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
+    const [showAlmanac, setShowAlmanac] = useState(false);
+    const [cursorMode, setCursorMode] = useState<CursorMode>('place');
+    const [showTypingPanel, setShowTypingPanel] = useState(true);
+    const [fuseFirstItem, setFuseFirstItem] = useState<GardenItem | null>(null);
+    const [timeOfDay, setTimeOfDay] = useState<'day' | 'evening' | 'night'>('day');
 
-  const fetchNewPrompt = useCallback(async () => {
-    setIsLoadingPrompt(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-      const promptToAI = `Generate a simple, one-line prompt for a word guessing game for kids in Spanish. The prompt should ask for a type of object, animal, or concept. For example: 'Escribe el nombre de una fruta' or 'Escribe algo que se encuentra en el cielo'. Also provide a list of at least 5 valid, simple, one-word answers in Spanish for that prompt. The response must be a valid JSON object with 'prompt' (string) and 'words' (array of strings) keys.`;
-      const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: promptToAI,
-          config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                  type: Type.OBJECT,
-                  properties: {
-                      prompt: { type: Type.STRING },
-                      words: { type: Type.ARRAY, items: { type: Type.STRING } }
-                  }
-              }
-          }
-      });
-      const jsonStr = response.text.trim();
-      const newPromptData = JSON.parse(jsonStr);
-      newPromptData.words = newPromptData.words.map((w: string) => w.toLowerCase());
-      setCurrentPrompt(newPromptData);
-    } catch (error) {
-      console.error("Error fetching new prompt from AI, using fallback:", error);
-      const fallbackKey = FALLBACK_KEYS[Math.floor(Math.random() * FALLBACK_KEYS.length)];
-      setCurrentPrompt(FALLBACK_CATEGORIES[fallbackKey]);
-    } finally {
-      setIsLoadingPrompt(false);
-    }
-  }, []);
+    // --- Dynamic Events State ---
+    const [goldenSuns, setGoldenSuns] = useState<{ id: number, x: number, y: number }[]>([]);
+    const [pests, setPests] = useState<{ id: number, gardenItemId: number }[]>([]);
 
-  useEffect(() => {
-    fetchNewPrompt();
-    speak("Bienvenido a tu Jardín de Palabras. Escribe lo que te pida para ganar soles y comprar plantas.");
-  }, [fetchNewPrompt]);
+    // --- Typing State ---
+    const [currentWord, setCurrentWord] = useState('');
+    const [typedValue, setTypedValue] = useState('');
+    const [pressedKey, setPressedKey] = useState<string | null>(null);
 
+    // --- Refs ---
+    const gameLoopRef = useRef<number>();
+    const saveStateRef = useRef<number>();
+    const eventsRef = useRef<number>();
+    const timeOfDayRef = useRef<number>();
+
+    const currentGarden = gardens.find(g => g.id === currentGardenId) as Garden;
+    const hasPool = currentGarden.items.some(item => item.type === 'pool');
+    
+    const allShopItems = [...SHOP_ITEMS, ...customPlants];
+
+    // --- Initialization ---
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY });
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setItemToPlace(null);
-        };
-
-        if (itemToPlace) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('keydown', handleKeyDown);
+        const loadedState = loadFullGardenState();
+        if (loadedState) {
+            setSuns(loadedState.suns);
+            setWater(loadedState.water);
+            setGardens(loadedState.gardens);
+            setAlmanacDiscovered(loadedState.almanacDiscovered);
+            setIsVip(loadedState.isVip);
+            setIsAdmin(loadedState.isAdmin);
+            setIsBioEngineer(loadedState.isBioEngineer);
+            setHasTeleporter(loadedState.hasTeleporter);
+            setCustomPlants(loadedState.customPlants);
         }
+        setupNewWord();
+    }, []);
+
+    // --- Game Loop (Passive Income, Events, Time) ---
+    useEffect(() => {
+        const loop = () => {
+            let sunsGenerated = 0;
+            let totalBoost = 1;
+            gardens.forEach(garden => {
+                garden.items.forEach(item => {
+                    if (item.type === 'object' && item.name === 'Tótem Solar') {
+                        totalBoost += 0.05;
+                    }
+                });
+            });
+
+            gardens.forEach(garden => {
+                const gardenPestIds = pests.map(p => p.gardenItemId);
+                garden.items.forEach(item => {
+                    if (item.growthStage === 'full' && !gardenPestIds.includes(item.instanceId)) {
+                        sunsGenerated += item.sunsPerSecond;
+                    }
+                });
+            });
+            setSuns(prev => prev + (sunsGenerated * totalBoost));
+        };
+        gameLoopRef.current = window.setInterval(loop, 1000);
+
+        const eventRunner = () => {
+            // Golden Sun
+            if (Math.random() < 0.01) { // 1% chance every 10 seconds
+                 setGoldenSuns(prev => [...prev, {id: Date.now(), x: Math.random() * 90 + 5, y: Math.random() * 70 + 5}]);
+            }
+            // Pest Attack
+            const maturePlants = currentGarden.items.filter(i => i.growthStage === 'full');
+            if (maturePlants.length > 2 && Math.random() < 0.05) { // 5% chance
+                const target = maturePlants[Math.floor(Math.random() * maturePlants.length)];
+                if (!pests.some(p => p.gardenItemId === target.instanceId)) {
+                    setPests(prev => [...prev, {id: Date.now(), gardenItemId: target.instanceId}]);
+                }
+            }
+        };
+        eventsRef.current = window.setInterval(eventRunner, 10000);
+
+        const timeChanger = () => {
+            setTimeOfDay(current => {
+                if (current === 'day') return 'evening';
+                if (current === 'evening') return 'night';
+                return 'day';
+            })
+        };
+        timeOfDayRef.current = window.setInterval(timeChanger, 60000); // Change every minute
 
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('keydown', handleKeyDown);
+            clearInterval(gameLoopRef.current);
+            clearInterval(eventsRef.current);
+            clearInterval(timeOfDayRef.current);
         };
-    }, [itemToPlace]);
+    }, [gardens, pests, currentGarden.items]);
 
+    // --- State Saving ---
     useEffect(() => {
-        const rabbitCount = animals.filter(a => a.type === 'rabbit').length;
-        if (rabbitCount > 0) {
-            const interval = setInterval(() => setWateringCans(prev => prev + rabbitCount), 60000);
-            return () => clearInterval(interval);
-        }
-    }, [animals]);
+        if (saveStateRef.current) clearTimeout(saveStateRef.current);
+        saveStateRef.current = window.setTimeout(() => {
+            const stateToSave: FullGardenState = { 
+                suns, water, gardens, almanacDiscovered, isVip, isAdmin, isBioEngineer, hasTeleporter, customPlants 
+            };
+            saveFullGardenState(stateToSave);
+        }, 3000);
+        return () => clearTimeout(saveStateRef.current);
+    }, [suns, water, gardens, almanacDiscovered, isVip, isAdmin, isBioEngineer, hasTeleporter, customPlants]);
+    
+    // --- Typing Logic ---
+    const setupNewWord = useCallback(() => {
+        setCurrentWord(DEFENSE_WORDS[Math.floor(Math.random() * DEFENSE_WORDS.length)]);
+        setTypedValue('');
+    }, []);
 
+    const handleKeyPress = useCallback((e: KeyboardEvent) => {
+        if (!showTypingPanel || showShop || showAdminPanel || showAlmanac || e.key.length > 1) return;
+        
+        const key = e.key.toLowerCase();
+        setPressedKey(key);
+        setTimeout(() => setPressedKey(null), 150);
+        
+        if (key === currentWord[typedValue.length]) {
+            const newTypedValue = typedValue + key;
+            setTypedValue(newTypedValue);
+
+            if (newTypedValue === currentWord) {
+                let sunsEarned = currentWord.length * 10;
+                const hasGnome = gardens.some(g => g.items.some(i => i.name === 'Gnomo de la Suerte'));
+                if (hasGnome && Math.random() < 0.1) { // 10% chance
+                    sunsEarned *= 2;
+                }
+                setSuns(prev => prev + sunsEarned);
+                setupNewWord();
+            }
+        }
+    }, [currentWord, typedValue, setupNewWord, showTypingPanel, showShop, showAdminPanel, showAlmanac, gardens]);
+    
     useEffect(() => {
-        const beeCount = animals.filter(a => a.type === 'bee').length;
-        if (beeCount > 0) {
-            const interval = setInterval(() => setSuns(prev => prev + beeCount), 10000);
-            return () => clearInterval(interval);
-        }
-    }, [animals]);
-     useEffect(() => {
-        const sunflowerCount = items.filter(i => i.name.toLowerCase() === 'girasol' && i.type === 'special_plant' && i.stage === 'full').length;
-        if (sunflowerCount > 0) {
-            const interval = setInterval(() => setSuns(prev => prev + sunflowerCount * 5), 30000);
-            return () => clearInterval(interval);
-        }
-    }, [items]);
-  
-  const handleValidationMessage = (message: string, isError: boolean) => {
-    setValidationMessage(message);
-    if(isError) playIncorrectSound();
-    setTimeout(() => setValidationMessage(null), 2000);
-  }
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [handleKeyPress]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const word = inputValue.trim().toLowerCase();
-    if (!word || isLoadingPrompt) return;
-
-    if (currentPrompt.words.includes(word)) {
-      playCorrectSound();
-      const sunsEarned = word.length;
-      setSuns(prev => prev + sunsEarned);
-      handleValidationMessage(`¡Correcto! +${sunsEarned} ☀️`, false);
-      setInputValue('');
-      fetchNewPrompt();
-    } else {
-      handleValidationMessage(`'${word}' no es un buen ejemplo. ¡Inténtalo de nuevo!`, true);
-    }
-  };
-
-  const handleItemClick = (e: React.MouseEvent, itemId: number) => {
-    e.stopPropagation(); 
-    if (itemToPlace) return;
-
-    if (isSellMode) {
-      const itemToSell = items.find(i => i.id === itemId);
-      if (!itemToSell) return;
-
-      const shopData = SHOP_ITEMS.find(shopItem => shopItem.name === itemToSell.name);
-      const sellPrice = Math.floor((shopData?.cost || 0) / 2);
-
-      playSellSound();
-      setSuns(prev => prev + sellPrice);
-      setItems(prev => prev.filter(i => i.id !== itemId));
-      handleValidationMessage(`¡Vendido! +${sellPrice} ☀️`, false);
-    } else {
-      if (wateringCans <= 0) {
-        handleValidationMessage("¡No tienes regaderas! Compra más en la tienda.", true);
-        return;
-      }
-      playPlantSound();
-      setWateringCans(prev => prev - 1);
-      setItems(prevItems => prevItems.map(item => {
-        if (item.id === itemId) {
-          if (item.stage === 'seed') return { ...item, stage: 'sprout' };
-          if (item.stage === 'sprout') return { ...item, stage: 'full' };
-        }
-        return item;
-      }));
-    }
-  };
-
-   const handlePlaceItem = (e: React.MouseEvent<HTMLElement>) => {
-    if (!itemToPlace) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    const newItem: GardenItem = {
-        id: Date.now(),
-        name: itemToPlace.name,
-        finalEmoji: itemToPlace.emoji,
-        x,
-        y,
-        stage: itemToPlace.type === 'special_plant' ? 'full' : 'seed',
-        type: itemToPlace.type === 'special_plant' ? 'special_plant' : undefined,
+    const updateGardenItem = (instanceId: number, updates: Partial<GardenItem>) => {
+        setGardens(prevGardens => prevGardens.map(g => 
+            g.id === currentGardenId 
+            ? { ...g, items: g.items.map(i => i.instanceId === instanceId ? { ...i, ...updates } : i) }
+            : g
+        ));
     };
     
-    setItems(prev => [...prev, newItem]);
-    setItemToPlace(null);
-    playPlantSound();
-  };
-  
-  const handlePurchase = (item: ShopItem) => {
-      if (suns < item.cost) {
-          handleValidationMessage("¡No tienes suficientes soles!", true);
-          return;
-      }
-      
-      setSuns(prev => prev - item.cost);
-      
-      if (item.type === 'plant' || item.type === 'special_plant') {
-          setItemToPlace(item);
-          setIsShopOpen(false);
-      } else if (item.type === 'consumable') {
-          if(item.id === 'wateringCan') setWateringCans(prev => prev + 1);
-      } else if (item.type === 'animal') {
-          const newAnimal: AnimalItem = {
-              id: Date.now(),
-              type: item.id as 'rabbit' | 'bee' | 'butterfly',
-              emoji: item.emoji,
-              x: 10 + Math.random() * 80,
-              y: 20 + Math.random() * 60,
-          };
-          setAnimals(prev => [...prev, newAnimal]);
-      }
-  };
+    // --- Core Game Actions ---
+    const handleItemClick = (item: GardenItem, e: React.MouseEvent) => {
+        e.stopPropagation();
+        switch (cursorMode) {
+            case 'sell':
+                const shopItem = allShopItems.find(s => s.id === item.shopId);
+                const sellPrice = Math.floor((shopItem?.cost || 0) / 2);
+                setSuns(prev => prev + sellPrice);
+                setGardens(gs => gs.map(g => g.id === currentGardenId ? {...g, items: g.items.filter(i => i.instanceId !== item.instanceId)} : g));
+                playSellSound();
+                break;
+            case 'water':
+                if (water > 0 && item.growthStage !== 'full') {
+                    playWateringSound();
+                    setWater(w => w - 1);
+                    if (item.growthStage === 'seed') {
+                        updateGardenItem(item.instanceId, { growthStage: 'sprout' });
+                    } else if (item.growthStage === 'sprout') {
+                        updateGardenItem(item.instanceId, { growthStage: 'full' });
+                    }
+                }
+                break;
+            case 'fuse':
+                if (item.growthStage !== 'full') return;
+                if (!fuseFirstItem) {
+                    setFuseFirstItem(item);
+                } else if (fuseFirstItem.instanceId !== item.instanceId && fuseFirstItem.shopId === item.shopId) {
+                    const nextItemId = item.shopId + 1;
+                    const nextShopItem = allShopItems.find(s => s.id === nextItemId && s.type === 'plant');
+                    if (nextShopItem) {
+                        // Remove both items
+                        setGardens(gs => gs.map(g => g.id === currentGardenId ? {...g, items: g.items.filter(i => i.instanceId !== item.instanceId && i.instanceId !== fuseFirstItem.instanceId)} : g));
+                        // Add the new one
+                        handlePurchase(nextShopItem, true); // true to bypass cost
+                    }
+                    setFuseFirstItem(null);
+                } else {
+                    setFuseFirstItem(null); // Deselect
+                }
+                break;
+        }
+    };
 
-  const handleSkip = () => {
-      if (isLoadingPrompt) return;
-      playSkipSound();
-      fetchNewPrompt();
-  };
-
-  const getEmojiForStage = (item: GardenItem): string => {
-    switch(item.stage) {
-        case 'seed': return '🌱';
-        case 'sprout': return '🪴';
-        case 'full': return item.finalEmoji;
-    }
-  }
-
-  const getTooltipText = (item: GardenItem): string => {
-      if (isSellMode) {
-          const shopData = SHOP_ITEMS.find(shopItem => shopItem.name === item.name);
-          const sellPrice = Math.floor((shopData?.cost || 0) / 2);
-          return `Vender ${item.name} por ${sellPrice} ☀️`;
-      }
-      if (item.stage !== 'full') {
-          return `Regar ${item.stage === 'seed' ? 'semilla' : 'brote'}`;
-      }
-      return item.name;
-  };
-
-  return (
-    <div className={`w-screen h-screen bg-sky-200 text-gray-800 font-sans flex flex-col overflow-hidden ${isSellMode ? 'cursor-not-allowed' : ''}`}>
-      {isShopOpen && <ShopModal suns={suns} onPurchase={handlePurchase} onClose={() => setIsShopOpen(false)} />}
-      
-      {itemToPlace && (
-        <div className="fixed pointer-events-none z-50 text-5xl" style={{ left: mousePos.x, top: mousePos.y, transform: 'translate(-50%, -50%)' }}>
-            {itemToPlace.emoji}
-        </div>
-      )}
-
-      {/* HUD */}
-      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20">
-        <div className="flex flex-col sm:flex-row gap-4">
-            <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg text-2xl font-bold text-yellow-600 flex items-center gap-2">☀️ <span>{suns}</span></div>
-            <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg text-2xl font-bold text-blue-600 flex items-center gap-2">💧 <span>{wateringCans}</span></div>
-            <div className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-lg flex items-center gap-2 font-bold">
-                {animals.filter(a => a.type === 'rabbit').length > 0 && <span>🐰 {animals.filter(a => a.type === 'rabbit').length}</span>}
-                {animals.filter(a => a.type === 'bee').length > 0 && <span>🐝 {animals.filter(a => a.type === 'bee').length}</span>}
-                {animals.filter(a => a.type === 'butterfly').length > 0 && <span>🦋 {animals.filter(a => a.type === 'butterfly').length}</span>}
-            </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <button onClick={() => setIsShopOpen(true)} className="bg-green-500 text-white px-6 py-3 rounded-full shadow-lg text-xl font-bold transform hover:scale-105 transition">
-              Tienda 🏪
-          </button>
-          <button onClick={() => setIsSellMode(prev => !prev)} className={`text-white px-4 py-3 rounded-full shadow-lg text-2xl font-bold transform hover:scale-105 transition ${isSellMode ? 'bg-red-500' : 'bg-yellow-500'}`}>
-              💰
-          </button>
-        </div>
-      </header>
-
-      {/* Garden Area */}
-      <main onClick={handlePlaceItem} className={`flex-grow relative bg-lime-100 ${itemToPlace ? 'cursor-copy' : ''}`}>
-        <div className="absolute top-0 left-0 right-0 h-2/3 bg-gradient-to-b from-sky-300 to-sky-100"></div>
-        <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-lime-600 to-lime-400"></div>
+    const handlePurchase = (item: ShopItem, free = false) => {
+        if (!free) {
+            if (suns < item.cost) return;
+            setSuns(prev => prev - item.cost);
+        }
         
-        {items.map(item => (
-          <div
-            key={item.id}
-            className={`absolute text-5xl group animate-jump-in transform hover:scale-110 transition-transform ${isSellMode ? 'cursor-pointer animate-shake' : (itemToPlace ? '' : 'cursor-pointer')}`}
-            style={{ left: `${item.x}%`, top: `${item.y}%`, transform: 'translate(-50%, -50%)' }}
-            onClick={(e) => handleItemClick(e, item.id)}
-          >
-            {getEmojiForStage(item)}
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-black/70 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                {getTooltipText(item)}
-            </span>
-          </div>
-        ))}
-         {animals.map(animal => (
-          <div
-            key={animal.id}
-            className="absolute text-5xl animate-float"
-            style={{ left: `${animal.x}%`, top: `${animal.y}%`, transform: 'translate(-50%, -50%)' }}
-          >
-            {animal.emoji}
-          </div>
-        ))}
-      </main>
+        playPurchaseSound();
 
-      {/* Input Area */}
-      <footer className="w-full p-4 bg-lime-700/80 backdrop-blur-sm shadow-2xl z-10">
-        {itemToPlace && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/50 text-white px-4 py-2 rounded-full z-20">
-                Haz clic para plantar tu {itemToPlace.name}. Presiona 'Esc' para cancelar.
+        if (item.type === 'upgrade') {
+            if (item.name === 'Pase VIP') setIsVip(true);
+            if (item.name === 'Panel de Creador') setIsAdmin(true);
+            if (item.name === 'Pase de Bioingeniero') setIsBioEngineer(true);
+            if (item.name === 'Teleportador Interdimensional') setHasTeleporter(true);
+            return;
+        }
+
+        if (item.name === 'Botella de Agua') {
+            setWater(w => w + 1);
+            return;
+        }
+
+        const newItem: GardenItem = {
+            instanceId: Date.now() + Math.random(),
+            shopId: item.id,
+            name: item.name,
+            emoji: item.emoji,
+            x: 20 + Math.random() * 60,
+            y: 20 + Math.random() * 60,
+            size: item.size,
+            type: item.type,
+            sunsPerSecond: item.sunsPerSecond,
+            growthStage: item.type === 'plant' ? 'seed' : 'full',
+        };
+        setGardens(gs => gs.map(g => g.id === currentGardenId ? {...g, items: [...g.items, newItem]} : g));
+        if (!almanacDiscovered.includes(item.id)) {
+            setAlmanacDiscovered(prev => [...prev, item.id]);
+        }
+        playPlantSound();
+    };
+
+    const handleCreatePlant = (plantData: Omit<ShopItem, 'id' | 'cost' | 'type' | 'isCustom'>) => {
+        const newPlant: ShopItem = {
+            ...plantData,
+            id: 10000 + customPlants.length,
+            cost: 0, // Free to place for creator
+            type: 'plant',
+            isCustom: true,
+        };
+        setCustomPlants(prev => [...prev, newPlant]);
+    };
+
+    const handleUnlockGarden = () => {
+        const cost = GARDEN_UNLOCK_COSTS[gardens.length];
+        if (suns >= cost) {
+            setSuns(s => s - cost);
+            setGardens(g => [...g, {id: g.length + 1, items: []}]);
+        }
+    };
+    
+    // --- Rendering ---
+    const renderItem = (item: GardenItem) => {
+        const sizeMap: Record<ItemSize, string> = { sm: 'text-4xl', md: 'text-6xl', lg: 'text-8xl', xl: 'text-9xl', planetary: 'text-9xl' };
+        let emoji = item.emoji;
+        if (item.growthStage === 'seed') emoji = '🌱';
+        if (item.growthStage === 'sprout') emoji = '🌿';
+
+        const isPested = pests.some(p => p.gardenItemId === item.instanceId);
+        
+        return (
+            <div
+                key={item.instanceId}
+                className={`absolute cursor-pointer transform transition-transform hover:scale-110 z-10 
+                    ${cursorMode === 'sell' ? 'animate-pulse' : ''}
+                    ${fuseFirstItem?.instanceId === item.instanceId ? 'ring-4 ring-yellow-300 rounded-full' : ''}
+                `}
+                style={{ left: `${item.x}%`, top: `${item.y}%`, transform: 'translate(-50%, -50%)' }}
+                onClick={(e) => handleItemClick(item, e)}
+            >
+                <div className={`${sizeMap[item.size]} relative ${item.type === 'animal' ? 'animate-bounce-slow' : ''}`}>
+                    {emoji}
+                    {isPested && <div className="absolute inset-0 text-6xl" onClick={(e) => { e.stopPropagation(); setPests(p => p.filter(pest => pest.gardenItemId !== item.instanceId))}}>🐀</div>}
+                </div>
             </div>
-        )}
-        <div className="max-w-xl mx-auto text-center">
-            {validationMessage && <p className="text-white font-bold mb-2 animate-bounce">{validationMessage}</p>}
-            <p className="text-xl font-semibold text-white mb-2 h-7" style={{textShadow: '1px 1px 2px rgba(0,0,0,0.5)'}}>
-                {isLoadingPrompt ? 'Generando nueva pista...' : currentPrompt.prompt}
-            </p>
-            <form onSubmit={handleSubmit} className="flex gap-2">
-                <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    className="w-full text-2xl p-3 border-2 border-lime-800 bg-lime-50 rounded-lg focus:outline-none focus:ring-4 focus:ring-yellow-300 focus:border-yellow-500 transition disabled:bg-gray-200"
-                    autoFocus
-                    placeholder={isLoadingPrompt ? '' : "Escribe aquí..."}
-                    disabled={isLoadingPrompt}
-                />
-                <button type="submit" className="bg-yellow-400 text-yellow-900 font-bold p-3 rounded-lg shadow-md hover:bg-yellow-500 transform hover:scale-105 transition disabled:bg-gray-400" disabled={isLoadingPrompt}>
-                    Crear
-                </button>
-                 <button type="button" onClick={handleSkip} className="bg-blue-400 text-white font-bold p-3 rounded-lg shadow-md hover:bg-blue-500 transform hover:scale-105 transition disabled:bg-gray-400" disabled={isLoadingPrompt}>
-                    Saltar
-                </button>
-            </form>
-            <div className="flex justify-center gap-4 mt-3">
-                <button onClick={onExit} className="text-white/80 hover:text-white transition">Salir</button>
+        );
+    };
+
+    const timeClass = {
+        day: 'from-cyan-300 via-sky-400 to-transparent',
+        evening: 'from-orange-400 via-pink-500 to-transparent',
+        night: 'from-indigo-900 via-black to-transparent',
+    }[timeOfDay];
+
+    return (
+        <div className="w-screen h-screen bg-green-400 font-mono flex flex-col items-center justify-center overflow-hidden select-none">
+            {showShop && <ShopModal items={allShopItems} suns={suns} onPurchase={handlePurchase} onClose={() => setShowShop(false)} hasPool={hasPool} isVip={isVip} hasTeleporter={hasTeleporter} />}
+            {showAdminPanel && <AdminPanelModal onCreate={handleCreatePlant} onClose={() => setShowAdminPanel(false)} />}
+            {showAlmanac && <AlmanacModal discoveredItems={gardens.flatMap(g => g.items)} allItems={SHOP_ITEMS} onClose={() => setShowAlmanac(false)} />}
+
+            <div className="w-full h-full flex flex-col relative">
+                <header className="w-full flex justify-between items-start p-4 z-30 flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
+                       <div className="bg-black/30 p-3 rounded-xl text-3xl font-bold text-white flex items-center shadow-lg">☀️ {Math.floor(suns).toLocaleString()}</div>
+                       <div className="bg-black/30 p-3 rounded-xl text-3xl font-bold text-white flex items-center shadow-lg">💧 {water.toLocaleString()}</div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 justify-end">
+                         <button onClick={() => setShowShop(true)} className="bg-green-600 text-white font-bold p-3 rounded-xl shadow-lg hover:bg-green-700 transition">🛍️ Tienda</button>
+                         <button onClick={() => setCursorMode('sell')} className={`${cursorMode==='sell' ? 'bg-red-700' : 'bg-red-500'} text-white font-bold p-3 rounded-xl shadow-lg hover:bg-red-600 transition`}>💰 Vender</button>
+                         <button onClick={() => setCursorMode('water')} className={`${cursorMode==='water' ? 'bg-blue-700' : 'bg-blue-500'} text-white font-bold p-3 rounded-xl shadow-lg hover:bg-blue-600 transition`}>💧 Regar</button>
+                         {isBioEngineer && <button onClick={() => { setCursorMode('fuse'); setFuseFirstItem(null); }} className={`${cursorMode==='fuse' ? 'bg-purple-700' : 'bg-purple-500'} text-white font-bold p-3 rounded-xl shadow-lg hover:bg-purple-600 transition`}>🧬 Fusionar</button>}
+                         <button onClick={() => setShowAlmanac(true)} className="bg-amber-600 text-white font-bold p-3 rounded-xl shadow-lg hover:bg-amber-700 transition">📖 Almanaque</button>
+                         {isAdmin && <button onClick={() => setShowAdminPanel(true)} className="bg-gray-700 text-white font-bold p-3 rounded-xl shadow-lg hover:bg-gray-800 transition">⚙️</button>}
+                         <button onClick={onExit} className="bg-gray-500 text-white font-bold p-3 rounded-xl shadow-lg hover:bg-gray-600 transition">Salir</button>
+                    </div>
+                     <div className="w-full flex gap-2 mt-2">
+                        {gardens.map(g => <button key={g.id} onClick={() => setCurrentGardenId(g.id)} className={`p-2 rounded-lg font-bold ${g.id === currentGardenId ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white'}`}>Jardín {g.id}</button>)}
+                        {gardens.length < GARDEN_UNLOCK_COSTS.length && <button onClick={handleUnlockGarden} className="p-2 rounded-lg bg-green-700 text-white font-bold">Comprar Jardín {gardens.length + 1} ({GARDEN_UNLOCK_COSTS[gardens.length].toLocaleString()}☀️)</button>}
+                     </div>
+                </header>
+
+                <main className={`w-full flex-grow relative bg-green-400 overflow-hidden`}>
+                     <div className={`absolute inset-0 bg-gradient-to-b ${timeClass} opacity-80 transition-all duration-1000`}></div>
+                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-green-500 to-transparent"></div>
+                    {timeOfDay === 'day' && <div className="absolute top-8 left-8 w-24 h-24 bg-yellow-300 rounded-full shadow-2xl"></div>}
+                    {timeOfDay === 'night' && <div className="absolute top-8 left-8 w-24 h-24 bg-gray-200 rounded-full shadow-2xl"></div>}
+                    <div className="absolute top-16 right-1/4 w-32 h-16 bg-white rounded-full opacity-80 animate-cloud-slow"></div>
+                    <div className="absolute top-32 left-1/4 w-48 h-24 bg-white rounded-full opacity-80 animate-cloud-fast"></div>
+                    
+                    {currentGarden.items.map(renderItem)}
+                    {goldenSuns.map(sun => 
+                        <div key={sun.id} className="absolute text-5xl cursor-pointer" style={{left: `${sun.x}%`, top: `${sun.y}%`}} onClick={() => { setSuns(s => s + 500); setGoldenSuns(gs => gs.filter(g => g.id !== sun.id))}}>☀️</div>
+                    )}
+                </main>
+
+                <div className={`absolute bottom-0 left-0 right-0 z-20 transition-transform duration-500 ${showTypingPanel ? 'translate-y-0' : 'translate-y-full'}`}>
+                     <button onClick={() => setShowTypingPanel(v => !v)} className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800/80 text-white p-2 rounded-t-lg">
+                        👁️ {showTypingPanel ? 'Ocultar Teclado' : 'Mostrar Teclado'}
+                    </button>
+                    <footer className="w-full p-6 bg-gray-800/80 text-center">
+                        <div className="relative w-full">
+                           <TypingHands targetKey={currentWord[typedValue.length] || ''} />
+                           <Keyboard targetKey={currentWord[typedValue.length] || ''} pressedKey={pressedKey} />
+                        </div>
+                        <p className="text-5xl tracking-widest font-bold text-white mt-4" style={{ textShadow: '2px 2px 4px #000' }}>
+                           {currentWord.split('').map((char, index) => (
+                                <span key={index} className={index < typedValue.length ? 'text-green-400' : 'text-gray-400'}>{char}</span>
+                           ))}
+                        </p>
+                    </footer>
+                </div>
+                 {!showTypingPanel && <button onClick={() => setShowTypingPanel(true)} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white p-4 rounded-full shadow-lg animate-bounce z-20">⌨️ Teclear para ganar Soles</button>}
             </div>
+            
+            <style>{`
+                @keyframes cloud-slow { 0% { transform: translateX(-150%); } 100% { transform: translateX(150vw); } }
+                .animate-cloud-slow { animation: cloud-slow 120s linear infinite; }
+                @keyframes cloud-fast { 0% { transform: translateX(150vw); } 100% { transform: translateX(-150%); } }
+                .animate-cloud-fast { animation: cloud-fast 80s linear infinite 5s; }
+                 @keyframes bounce-slow { 0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); } }
+                .animate-bounce-slow { animation: bounce-slow 3s infinite; }
+            `}</style>
         </div>
-      </footer>
-       <style>{`
-        .cursor-copy { cursor: copy !important; }
-        @keyframes float {
-            0% { transform: translate(-50%, -50%) translateY(0px); }
-            50% { transform: translate(-50%, -50%) translateY(-10px); }
-            100% { transform: translate(-50%, -50%) translateY(0px); }
-        }
-        .animate-float {
-            animation: float 6s ease-in-out infinite;
-        }
-        @keyframes shake {
-            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
-            25% { transform: translate(-50%, -50%) rotate(-2deg); }
-            75% { transform: translate(-50%, -50%) rotate(2deg); }
-        }
-        .animate-shake {
-            animation: shake 0.5s ease-in-out infinite;
-        }
-    `}</style>
-    </div>
-  );
+    );
 };
 
 export default WordGardenScreen;

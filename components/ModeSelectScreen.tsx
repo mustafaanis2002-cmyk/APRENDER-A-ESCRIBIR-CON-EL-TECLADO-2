@@ -9,6 +9,7 @@ interface ModeSelectScreenProps {
   onSelectTypingTeleporter: () => void;
   onSelectWordGarden: () => void;
   onSelectStoryTeller: () => void;
+  onSelectTypingKitchen: () => void;
   playerName: string | null;
 }
 
@@ -21,6 +22,7 @@ const ModeSelectScreen: React.FC<ModeSelectScreenProps> = ({
     onSelectTypingTeleporter,
     onSelectWordGarden,
     onSelectStoryTeller,
+    onSelectTypingKitchen,
     playerName 
 }) => {
   return (
@@ -28,7 +30,7 @@ const ModeSelectScreen: React.FC<ModeSelectScreenProps> = ({
       <div className="text-center bg-white p-10 rounded-2xl shadow-2xl max-w-7xl w-full">
         <h1 className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">¡Hola, {playerName || 'Jugador'}!</h1>
         <p className="text-gray-600 text-lg mb-8">¿Qué te gustaría hacer hoy?</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 justify-center gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 justify-center gap-6">
           <button
             onClick={onSelectPractice}
             className="group relative w-full h-48 bg-green-500 text-white p-6 rounded-2xl shadow-lg hover:bg-green-600 transform hover:-translate-y-2 transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-green-300 overflow-hidden"
@@ -123,6 +125,18 @@ const ModeSelectScreen: React.FC<ModeSelectScreenProps> = ({
             </div>
             <div className="absolute -bottom-4 -right-4 text-6xl opacity-20 group-hover:scale-125 transition-transform duration-300">
               📖
+            </div>
+          </button>
+           <button
+            onClick={onSelectTypingKitchen}
+            className="group relative w-full h-48 bg-amber-500 text-white p-6 rounded-2xl shadow-lg hover:bg-amber-600 transform hover:-translate-y-2 transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-amber-300 overflow-hidden"
+          >
+            <div className="text-left">
+              <h2 className="text-2xl font-bold">Cocina de Teclas</h2>
+              <p className="mt-2 opacity-90">¡Escribe los ingredientes para cocinar platos deliciosos!</p>
+            </div>
+            <div className="absolute -bottom-4 -right-4 text-6xl opacity-20 group-hover:scale-125 transition-transform duration-300">
+              🍳
             </div>
           </button>
         </div>

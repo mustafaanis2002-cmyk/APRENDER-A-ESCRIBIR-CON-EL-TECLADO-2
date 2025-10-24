@@ -11,9 +11,9 @@ interface StoryTellerScreenProps {
 
 const FALLBACK_SENTENCES = [
     "El sol brilla en el cielo azul.",
-    "Un gato juguetón persigue una mariposa.",
-    "El valiente caballero rescató a la princesa.",
-    "Los pájaros cantan felices en los árboles.",
+    "Un gato jugueton persigue una mariposa.",
+    "El valiente caballero rescata a la princesa.",
+    "Los pajaros cantan felices en los arboles.",
     "Me encanta comer pizza con mucho queso."
 ];
 
@@ -35,7 +35,7 @@ const StoryTellerScreen: React.FC<StoryTellerScreenProps> = ({ onExit }) => {
         setCharIndex(0);
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            const promptToAI = `Generate a JSON object containing a list of 10 simple, fun, and kid-friendly sentences in Spanish for a typing game. The sentences should be grammatically correct, use simple vocabulary, and be engaging for children. The response must be a valid JSON object with a single key "sentences" which is an array of strings.`;
+            const promptToAI = `Generate a JSON object containing a list of 10 simple, fun, and kid-friendly sentences in Spanish for a typing game. The sentences should be grammatically correct, use simple vocabulary, be engaging for children, and MUST NOT contain any accented characters (like á, é, í, ó, ú) or special symbols. The response must be a valid JSON object with a single key "sentences" which is an array of strings.`;
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: promptToAI,

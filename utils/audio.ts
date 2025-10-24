@@ -78,12 +78,27 @@ export const playSellSound = () => {
     setTimeout(() => playTone(1200, 0.1, 'sine'), 80);
 };
 
+export const playWateringSound = () => {
+    playTone(1500, 0.2, 'triangle');
+    setTimeout(() => playTone(1200, 0.1, 'sine'), 50);
+};
+
 export const playRemoveSound = () => {
     playTone(300, 0.1, 'sawtooth');
 };
 
 export const playSkipSound = () => {
     playTone(1000, 0.05, 'sawtooth');
+};
+
+export const playChopSound = () => {
+    playTone(550, 0.08, 'sawtooth');
+};
+
+export const playRecipeCompleteSound = () => {
+    playTone(700, 0.1, 'triangle');
+    setTimeout(() => playTone(900, 0.1, 'triangle'), 120);
+    setTimeout(() => playTone(1100, 0.2, 'triangle'), 240);
 };
 
 
@@ -124,6 +139,6 @@ export const PRONUNCIATION_MAP: { [key: string]: string } = {
   'ñ': 'eñe',
   ',': 'coma',
   '.': 'punto',
-  '-': 'guión',
+  '-': 'guion',
   ' ': 'espacio',
 };

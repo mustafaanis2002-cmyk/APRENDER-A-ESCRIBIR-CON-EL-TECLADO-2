@@ -13,6 +13,7 @@ import RhythmTypingScreen from './components/RhythmTypingScreen';
 import TypingTeleporterScreen from './components/TypingTeleporterScreen';
 import WordGardenScreen from './components/WordGardenScreen';
 import StoryTellerScreen from './components/StoryTellerScreen';
+import TypingKitchenScreen from './components/TypingKitchenScreen';
 
 import { Level, ScoreEntry, Opponent, RaceResult, GameState } from './types';
 import { loadLeaderboard, updateLeaderboard, savePlayerName, loadPlayerName } from './utils/storage';
@@ -106,6 +107,10 @@ const App: React.FC = () => {
     setGameState('storyTeller');
   };
 
+  const handleSelectTypingKitchen = () => {
+    setGameState('typingKitchen');
+  };
+
   const handleRaceComplete = (result: RaceResult) => {
     setRaceResult(result);
     setGameState('multiplayer-result');
@@ -168,6 +173,7 @@ const App: React.FC = () => {
             onSelectTypingTeleporter={handleSelectTypingTeleporter}
             onSelectWordGarden={handleSelectWordGarden}
             onSelectStoryTeller={handleSelectStoryTeller}
+            onSelectTypingKitchen={handleSelectTypingKitchen}
             playerName={playerName} 
         />;
       case 'levelSelect':
@@ -219,6 +225,8 @@ const App: React.FC = () => {
           return <WordGardenScreen onExit={handleBackToMenu} />;
       case 'storyTeller':
           return <StoryTellerScreen onExit={handleBackToMenu} />;
+      case 'typingKitchen':
+          return <TypingKitchenScreen onExit={handleBackToMenu} />;
       default:
         return <StartScreen onStart={handleStart} />;
     }

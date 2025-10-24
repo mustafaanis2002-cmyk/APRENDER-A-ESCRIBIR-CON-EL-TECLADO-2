@@ -1,15 +1,11 @@
-// Fix: Removed an incorrect import of `GameState` from './App'. The `GameState` type is defined in this file, and the import was causing a circular dependency error.
-
-// Fix: Create type definitions for Level and ScoreEntry.
-export type GameState = 'start' | 'nameInput' | 'modeSelect' | 'levelSelect' | 'playing' | 'levelComplete' | 'multiplayer-game' | 'multiplayer-result' | 'typingDefense' | 'guessTheWord' | 'rhythmTyping' | 'typingTeleporter' | 'wordGarden' | 'storyTeller';
 
 export interface Level {
   level: number;
   title: string;
+  color: string;
   challenges: string[];
   pointsPerCharacter: number;
   pointsToUnlock: number;
-  color: string;
 }
 
 export interface ScoreEntry {
@@ -18,42 +14,73 @@ export interface ScoreEntry {
 }
 
 export interface Opponent {
-    name: string;
-    icon: string;
-    cps: number; // characters per second
+  name: string;
+  icon: string;
+  cps: number; // characters per second
 }
 
 export interface RaceResult {
-    winner: 'player' | 'opponent' | 'tie';
-    playerTime: number;
-    opponentTime: number;
-    // Fix: Add opponentName to the RaceResult interface to store the opponent's name for the results screen.
-    opponentName: string;
+  winner: 'player' | 'opponent' | 'tie';
+  playerTime: number;
+  opponentTime: number;
+  opponentName: string;
+}
+
+// Fix: Define and export GameState to resolve import/export errors.
+export type GameState =
+  | 'start'
+  | 'nameInput'
+  | 'modeSelect'
+  | 'levelSelect'
+  | 'playing'
+  | 'levelComplete'
+  | 'multiplayer-game'
+  | 'multiplayer-result'
+  | 'typingDefense'
+  | 'guessTheWord'
+  | 'rhythmTyping'
+  | 'typingTeleporter'
+  | 'wordGarden'
+  | 'storyTeller'
+  | 'typingKitchen';
+
+
+// --- Word Garden Specific Types (COMPLEX) ---
+
+export type ItemType = 'plant' | 'animal' | 'pool' | 'object' | 'upgrade' | 'special_plant';
+export type ItemSize = 'sm' | 'md' | 'lg' | 'xl' | 'planetary';
+export type GrowthStage = 'seed' | 'sprout' | 'full';
+
+
+export interface ShopItem {
+    id: number;
+    name: string;
+    emoji: string;
+    description: string;
+    cost: number;
+    sunsPerSecond: number;
+    type: ItemType;
+    size: ItemSize;
+    requiresPool?: boolean;
+    growthBoost?: number;
+    isCustom?: boolean;
+    requiresVip?: boolean;
 }
 
 export interface GardenItem {
-  id: number;
-  name: string;
-  finalEmoji: string;
-  x: number; // percentage
-  y: number; // percentage
-  stage: 'seed' | 'sprout' | 'full';
-  type?: 'special_plant'; // for distinguishing special items like sunflowers
-}
-
-export interface ShopItem {
-    id: string;
+    instanceId: number;
+    shopId: number;
     name: string;
-    emoji: string;
-    cost: number;
-    description: string;
-    type: 'consumable' | 'animal' | 'special_plant' | 'plant';
-}
-
-export interface AnimalItem {
-    id: number;
-    type: 'rabbit' | 'bee' | 'butterfly';
     emoji: string;
     x: number;
     y: number;
+    size: ItemSize;
+    type: ItemType;
+    sunsPerSecond: number;
+    growthStage: GrowthStage;
+}
+
+export interface Garden {
+    id: number;
+    items: GardenItem[];
 }
